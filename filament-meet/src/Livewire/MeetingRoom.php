@@ -196,6 +196,8 @@ class MeetingRoom extends Component
 
     public function render(): \Illuminate\View\View
     {
-        return view('filament-meet::livewire.meeting-room');
+        return view('filament-meet::livewire.meeting-room', [
+            'lwComponentId' => $this->getId(),
+        ]);
     }
 }

@@ -1,4 +1,22 @@
-{{-- Define meetingRoom before Filament/Livewire scripts: @push from Livewire views is unreliable with Livewire v4 + Alpine boot order. --}}
+{{-- Livewire injects wire:id on the FIRST HTML tag: keep one root <div> so wire:poll / wire:click bind correctly. --}}
+<div
+    class="flex flex-col h-full"
+    wire:poll.5s="refreshMeetingWhenWaiting"
+    x-data="meetingRoom(@js([
+        'roomId'               => $roomId,
+        'domain'               => $jitsiDomain,
+        'displayName'          => $displayName,
+        'email'                => $userEmail,
+        'jwt'                  => $jwtToken,
+        'isHost'               => $isHost,
+        'meetingUuid'          => $meeting->uuid,
+        'livewireComponentId'  => $lwComponentId,
+    ]))"
+    x-init="init()"
+    @meeting-ended.window="onMeetingEnded()"
+    @meeting-started.window="onMeetingStartedFromLivewire()"
+>
+{{-- Runs during parse before Alpine evaluates x-data on this div. --}}
 <script>
 window.meetingRoom = function meetingRoom(config) {
     return {
@@ -98,36 +116,6 @@ window.meetingRoom = function meetingRoom(config) {
                     startWithVideoMuted: false,
                     disableDeepLinking: true,
                     prejoinPageEnabled: false,
-                    // Participant pane / invite / security / mute-all need toolbar entries.
-                    toolbarButtons: [
-                        'microphone',
-                        'camera',
-                        'desktop',
-                        'chat',
-                        'raisehand',
-                        'participants-pane',
-                        'invite',
-                        'tileview',
-                        'hangup',
-                        'settings',
-                        'fullscreen',
-                        'filmstrip',
-                        'mute-everyone',
-                        'security',
-                    ],
-                    participantsPane: {
-                        hideModeratorSettingsTab: false,
-                        hideMoreActionsButton: false,
-                        hideMuteAllButton: false,
-                    },
-                },
-                interfaceConfigOverwrite: {
-                    SHOW_JITSI_WATERMARK: false,
-                    SHOW_WATERMARK_FOR_GUESTS: false,
-                    SHOW_BRAND_WATERMARK: false,
-                    BRAND_WATERMARK_LINK: '',
-                    MOBILE_APP_PROMO: false,
-                    DEFAULT_REMOTE_DISPLAY_NAME: 'Participant',
                 },
                 width:  '100%',
                 height: '100%',
@@ -137,7 +125,13 @@ window.meetingRoom = function meetingRoom(config) {
                 options.jwt = this.jwt;
             }
 
-            this.api = new JitsiMeetExternalAPI(this.domain, options);
+            try {
+                this.api = new JitsiMeetExternalAPI(this.domain, options);
+            } catch (e) {
+                console.error('JitsiMeetExternalAPI failed:', e);
+                this.jitsiLoadStarted = false;
+                return;
+            }
 
             this.bindJitsiEvents();
             this.startTimer();
@@ -249,25 +243,6 @@ window.meetingRoom = function meetingRoom(config) {
     };
 };
 </script>
-
-<div
-    class="flex flex-col h-full"
-    wire:poll.5s="refreshMeetingWhenWaiting"
-    x-data="meetingRoom(@js([
-        'roomId'               => $roomId,
-        'domain'               => $jitsiDomain,
-        'displayName'          => $displayName,
-        'email'                => $userEmail,
-        'jwt'                  => $jwtToken,
-        'isHost'               => $isHost,
-        'meetingUuid'          => $meeting->uuid,
-        'livewireComponentId'  => $__livewire->getId(),
-    ]))"
-    x-init="init()"
-    x-cloak
-    @meeting-ended.window="onMeetingEnded()"
-    @meeting-started.window="onMeetingStartedFromLivewire()"
->
     {{-- ================================================================== --}}
     {{-- TOP BAR                                                             --}}
     {{-- ================================================================== --}}

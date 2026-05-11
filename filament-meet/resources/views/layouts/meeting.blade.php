@@ -58,13 +58,17 @@
     @livewireScripts
 
     <script>
-        document.addEventListener('livewire:initialized', () => {
+        {{-- livewire:init / livewire:initialized already fired while the Livewire bundle ran; register listeners synchronously. --}}
+        (function () {
+            if (typeof Livewire === 'undefined' || typeof Livewire.on !== 'function') {
+                return;
+            }
             Livewire.on('redirect-to-panel', ({ url }) => {
                 if (url) {
                     window.location.href = url;
                 }
             });
-        });
+        })();
     </script>
 </body>
 </html>
