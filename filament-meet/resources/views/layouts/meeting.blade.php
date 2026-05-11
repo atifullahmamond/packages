@@ -40,6 +40,47 @@
             background-color: #0a0a0c;
         }
 
+        /*
+         | Host apps often only Tailwind-scan resources/**/*.blade.php, so utilities in this
+         | package are missing from Vite builds. These rules keep the shell + Jitsi mount usable.
+         */
+        .meeting-layout > .meet-app {
+            flex: 1 1 0%;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .meeting-layout .meet-main {
+            flex: 1 1 0%;
+            min-height: 0;
+            display: flex;
+            flex-direction: row;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .meeting-layout .meet-stage {
+            flex: 1 1 0%;
+            min-width: 0;
+            min-height: 0;
+            position: relative;
+            overflow: hidden;
+            background-color: #09090b;
+        }
+
+        .meeting-layout #jitsi-container {
+            width: 100%;
+            height: 100%;
+            min-height: 240px;
+        }
+
+        .meeting-layout .meet-app > header,
+        .meeting-layout .meet-app > footer {
+            flex-shrink: 0;
+        }
+
         /* Custom scrollbar for participant list */
         .participant-scroll::-webkit-scrollbar { width: 4px; }
         .participant-scroll::-webkit-scrollbar-track { background: transparent; }

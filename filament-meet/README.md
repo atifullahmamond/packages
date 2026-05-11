@@ -133,6 +133,36 @@ php artisan migrate
 
 ---
 
+### Step 4b — Frontend assets (Tailwind / Vite)
+
+The meeting room Blade file uses **Tailwind utility classes**. Your app’s CSS build must **see** those class names, or the layout (and Jitsi iframe height) will look broken.
+
+In **`resources/css/app.css`** (Tailwind v4), add a **`@source`** line so Tailwind scans this package’s Blade files.
+
+**Normal install** (package only under `vendor/`):
+
+```css
+@source '../../vendor/atifullahmamond/filament-meet/resources/**/*.blade.php';
+```
+
+**Same repo as your app** (e.g. `packages/filament-meet` next to `app/`), use that path instead (or in addition):
+
+```css
+@source '../../packages/filament-meet/resources/**/*.blade.php';
+```
+
+Then rebuild assets:
+
+```bash
+npm run build
+# or during development:
+npm run dev
+```
+
+The package also ships **minimal fallback CSS** in the meeting layout (`.meet-app`, `#jitsi-container`, etc.) so Jitsi can mount even without every utility — but you should still add `@source` and run **`npm run build`** for the full UI.
+
+---
+
 ### Step 5 — Configuration (optional)
 
 Unless you change Jitsi, routes, or broadcasting, you **do not need** a published config: `config/filament-meet.php` is merged by the ServiceProvider using `.env`.
@@ -367,6 +397,21 @@ filament-meet/
         └── MeetingService.php            ← All business logic
 ```
 
+## Shipping updates (maintainers)
+
+Your **source of truth** is the package folder in the monorepo (this directory). To ship what you built locally:
+
+1. **Commit and push** under `filament-meet/` on your Git branch (e.g. `main` on [atifullahmamond/packages](https://github.com/atifullahmamond/packages)).
+2. **Consumers on ZIP / `dev-main`** (README Method A): run  
+   `composer update atifullahmamond/filament-meet`  
+   so Composer pulls a fresh archive.
+3. **Consumers on `path` + symlink**: no Composer update needed; edits are live.
+4. **Packagist / semver**: after you publish the package, tag a release (e.g. `filament-meet/v1.0.1` or your monorepo’s tag scheme) and bump **`require`** in apps to that version, then `composer update`.
+
+After upgrading the PHP package, remind users (or your own apps) to **`npm run build`** if Blade/CSS in the package changed, and to keep the **Tailwind `@source`** line in **`resources/css/app.css`** (Step 4b).
+
+---
+
 ## Links
 
 | | |
@@ -385,6 +430,7 @@ filament-meet/
 - [ ] **`git tag` releases** on GitHub, e.g. `v1.0.0`.
 - [ ] **Packagist** submit + hook for auto‑update after push.
 - [ ] **Smoke test** another Laravel app via `composer require atifullahmamond/filament-meet` (not only `path`).
+- [ ] **README Step 4b** — Tailwind `@source` + `npm run build` documented for meeting room UI.
 - Optional: **CHANGELOG.md**, PHPUnit/Pest tests, GitHub Actions CI.
 
 ## Feature Checklist

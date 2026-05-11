@@ -1,6 +1,6 @@
 {{-- Livewire injects wire:id on the FIRST HTML tag: keep one root <div> so wire:poll / wire:click bind correctly. --}}
 <div
-    class="flex flex-col h-full"
+    class="meet-app flex flex-col h-full"
     wire:poll.5s="refreshMeetingWhenWaiting"
     x-data="meetingRoom(@js([
         'roomId'               => $roomId,
@@ -16,7 +16,6 @@
     @meeting-ended.window="onMeetingEnded()"
     @meeting-started.window="onMeetingStartedFromLivewire()"
 >
-{{-- Runs during parse before Alpine evaluates x-data on this div. --}}
 <script>
 window.meetingRoom = function meetingRoom(config) {
     return {
@@ -296,10 +295,10 @@ window.meetingRoom = function meetingRoom(config) {
     {{-- ================================================================== --}}
     {{-- MAIN CONTENT AREA                                                   --}}
     {{-- ================================================================== --}}
-    <div class="flex flex-1 overflow-hidden relative">
+    <div class="meet-main flex flex-1 overflow-hidden relative">
 
         {{-- JITSI: only the iframe mount is wire:ignore so overlays & Livewire can still update --}}
-        <div class="flex-1 relative bg-zinc-950 overflow-hidden">
+        <div class="meet-stage flex-1 relative bg-zinc-950 overflow-hidden">
 
             <div class="absolute inset-0 z-0" wire:ignore>
                 <div id="jitsi-container" class="w-full h-full"></div>
