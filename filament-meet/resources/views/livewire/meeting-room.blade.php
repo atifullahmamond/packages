@@ -1,3 +1,254 @@
+{{-- Define meetingRoom before Filament/Livewire scripts: @push from Livewire views is unreliable with Livewire v4 + Alpine boot order. --}}
+<script>
+window.meetingRoom = function meetingRoom(config) {
+    return {
+        // Config
+        roomId:      config.roomId,
+        domain:      config.domain,
+        displayName: config.displayName,
+        email:       config.email,
+        jwt:         config.jwt,
+        isHost:      config.isHost,
+        meetingUuid: config.meetingUuid,
+
+        // State
+        api:               null,
+        jitsiLoadStarted: false,
+        jitsiReady:       false,
+        isMeetingEnded: false,
+        audioMuted:   false,
+        videoMuted:   false,
+        isSharing:    false,
+        sidebarOpen:  window.innerWidth >= 640,
+        sidebarTab:   'participants',
+        elapsedTime:  '00:00',
+        startedAt:    null,
+        timerInterval: null,
+
+        // ----------------------------------------------------------------
+        // Bootstrap
+        // ----------------------------------------------------------------
+        init() {
+            // If meeting is active, load Jitsi immediately
+            @if($meeting->isActive())
+                this.loadJitsi();
+            @elseif($meeting->isScheduled() && $isHost)
+                // Host: after "Start meeting", Livewire dispatches meeting-started → loadJitsi()
+            @elseif($meeting->isScheduled())
+                // Participant: Echo meeting.started or wire:poll refresh → meeting-started → loadJitsi()
+            @endif
+        },
+
+        onMeetingStartedFromLivewire() {
+            if (this.isMeetingEnded || this.api) {
+                return;
+            }
+            this.loadJitsi();
+        },
+
+        // ----------------------------------------------------------------
+        // Jitsi Loading
+        // ----------------------------------------------------------------
+        loadJitsi() {
+            if (this.jitsiLoadStarted || this.api) {
+                return;
+            }
+            this.jitsiLoadStarted = true;
+
+            if (document.getElementById('jitsi-api-script')) {
+                this.initJitsiApi();
+                return;
+            }
+
+            const script = document.createElement('script');
+            script.id  = 'jitsi-api-script';
+            script.src = `https://${this.domain}/external_api.js`;
+            script.onload  = () => this.initJitsiApi();
+            script.onerror = () => {
+                console.error('Failed to load Jitsi external API script.');
+                this.jitsiLoadStarted = false;
+            };
+            document.head.appendChild(script);
+        },
+
+        initJitsiApi() {
+            if (typeof JitsiMeetExternalAPI === 'undefined') {
+                console.error('JitsiMeetExternalAPI not available.');
+                this.jitsiLoadStarted = false;
+                return;
+            }
+
+            const parentNode = document.getElementById('jitsi-container');
+            if (! parentNode) {
+                console.error('Jitsi container node missing.');
+                this.jitsiLoadStarted = false;
+                return;
+            }
+
+            const options = {
+                roomName:     this.roomId,
+                parentNode,
+                userInfo: {
+                    displayName: this.displayName,
+                    email:       this.email,
+                },
+                configOverwrite: {
+                    startWithAudioMuted: false,
+                    startWithVideoMuted: false,
+                    disableDeepLinking: true,
+                    prejoinPageEnabled: false,
+                    // Participant pane / invite / security / mute-all need toolbar entries.
+                    toolbarButtons: [
+                        'microphone',
+                        'camera',
+                        'desktop',
+                        'chat',
+                        'raisehand',
+                        'participants-pane',
+                        'invite',
+                        'tileview',
+                        'hangup',
+                        'settings',
+                        'fullscreen',
+                        'filmstrip',
+                        'mute-everyone',
+                        'security',
+                    ],
+                    participantsPane: {
+                        hideModeratorSettingsTab: false,
+                        hideMoreActionsButton: false,
+                        hideMuteAllButton: false,
+                    },
+                },
+                interfaceConfigOverwrite: {
+                    SHOW_JITSI_WATERMARK: false,
+                    SHOW_WATERMARK_FOR_GUESTS: false,
+                    SHOW_BRAND_WATERMARK: false,
+                    BRAND_WATERMARK_LINK: '',
+                    MOBILE_APP_PROMO: false,
+                    DEFAULT_REMOTE_DISPLAY_NAME: 'Participant',
+                },
+                width:  '100%',
+                height: '100%',
+            };
+
+            if (this.jwt) {
+                options.jwt = this.jwt;
+            }
+
+            this.api = new JitsiMeetExternalAPI(this.domain, options);
+
+            this.bindJitsiEvents();
+            this.startTimer();
+            // Iframe + API accept executeCommand once constructed (before full conference join).
+            this.jitsiReady = true;
+        },
+
+        // ----------------------------------------------------------------
+        // Jitsi Events
+        // ----------------------------------------------------------------
+        bindJitsiEvents() {
+            this.api.addEventListeners({
+                videoConferenceJoined: (event) => {
+                    console.log('Jitsi: joined', event);
+                    this.jitsiReady = true;
+                },
+
+                videoConferenceLeft: (event) => {
+                    console.log('Jitsi: left', event);
+                    @this.call('leaveMeeting');
+                },
+
+                participantJoined: (event) => {
+                    console.log('Jitsi: participant joined', event);
+                    // Livewire handles participant list via Echo
+                },
+
+                participantLeft: (event) => {
+                    console.log('Jitsi: participant left', event);
+                },
+
+                audioMuteStatusChanged: ({ muted }) => {
+                    this.audioMuted = muted;
+                },
+
+                videoMuteStatusChanged: ({ muted }) => {
+                    this.videoMuted = muted;
+                },
+
+                screenSharingStatusChanged: ({ on }) => {
+                    this.isSharing = on;
+                },
+            });
+        },
+
+        // ----------------------------------------------------------------
+        // Controls
+        // ----------------------------------------------------------------
+        toggleAudio() {
+            if (this.api) {
+                this.api.executeCommand('toggleAudio');
+            }
+        },
+
+        toggleVideo() {
+            if (this.api) {
+                this.api.executeCommand('toggleVideo');
+            }
+        },
+
+        toggleScreenShare() {
+            if (this.api) {
+                this.api.executeCommand('toggleShareScreen');
+            }
+        },
+
+        toggleJitsiChat() {
+            if (this.api) {
+                this.api.executeCommand('toggleChat');
+            }
+        },
+
+        // ----------------------------------------------------------------
+        // Meeting-ended handler
+        // ----------------------------------------------------------------
+        onMeetingEnded() {
+            this.isMeetingEnded = true;
+            this.stopTimer();
+            if (this.api) {
+                this.api.dispose();
+                this.api = null;
+            }
+            this.jitsiLoadStarted = false;
+            this.jitsiReady = false;
+        },
+
+        // ----------------------------------------------------------------
+        // Timer
+        // ----------------------------------------------------------------
+        startTimer() {
+            this.startedAt = Date.now();
+            this.timerInterval = setInterval(() => {
+                const diff = Math.floor((Date.now() - this.startedAt) / 1000);
+                const h    = Math.floor(diff / 3600);
+                const m    = Math.floor((diff % 3600) / 60);
+                const s    = diff % 60;
+                this.elapsedTime = h > 0
+                    ? `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`
+                    : `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+            }, 1000);
+        },
+
+        stopTimer() {
+            if (this.timerInterval) {
+                clearInterval(this.timerInterval);
+                this.timerInterval = null;
+            }
+        },
+    };
+};
+</script>
+
 <div
     class="flex flex-col h-full"
     wire:poll.5s="refreshMeetingWhenWaiting"
@@ -316,255 +567,3 @@
         <div class="hidden sm:block w-24"></div>
     </footer>
 </div>
-
-@push('scripts')
-<script>
-function meetingRoom(config) {
-    return {
-        // Config
-        roomId:      config.roomId,
-        domain:      config.domain,
-        displayName: config.displayName,
-        email:       config.email,
-        jwt:         config.jwt,
-        isHost:      config.isHost,
-        meetingUuid: config.meetingUuid,
-
-        // State
-        api:               null,
-        jitsiLoadStarted: false,
-        jitsiReady:       false,
-        isMeetingEnded: false,
-        audioMuted:   false,
-        videoMuted:   false,
-        isSharing:    false,
-        sidebarOpen:  window.innerWidth >= 640,
-        sidebarTab:   'participants',
-        elapsedTime:  '00:00',
-        startedAt:    null,
-        timerInterval: null,
-
-        // ----------------------------------------------------------------
-        // Bootstrap
-        // ----------------------------------------------------------------
-        init() {
-            // If meeting is active, load Jitsi immediately
-            @if($meeting->isActive())
-                this.loadJitsi();
-            @elseif($meeting->isScheduled() && $isHost)
-                // Host: after "Start meeting", Livewire dispatches meeting-started → loadJitsi()
-            @elseif($meeting->isScheduled())
-                // Participant: Echo meeting.started or wire:poll refresh → meeting-started → loadJitsi()
-            @endif
-        },
-
-        onMeetingStartedFromLivewire() {
-            if (this.isMeetingEnded || this.api) {
-                return;
-            }
-            this.loadJitsi();
-        },
-
-        // ----------------------------------------------------------------
-        // Jitsi Loading
-        // ----------------------------------------------------------------
-        loadJitsi() {
-            if (this.jitsiLoadStarted || this.api) {
-                return;
-            }
-            this.jitsiLoadStarted = true;
-
-            if (document.getElementById('jitsi-api-script')) {
-                this.initJitsiApi();
-                return;
-            }
-
-            const script = document.createElement('script');
-            script.id  = 'jitsi-api-script';
-            script.src = `https://${this.domain}/external_api.js`;
-            script.onload  = () => this.initJitsiApi();
-            script.onerror = () => {
-                console.error('Failed to load Jitsi external API script.');
-                this.jitsiLoadStarted = false;
-            };
-            document.head.appendChild(script);
-        },
-
-        initJitsiApi() {
-            if (typeof JitsiMeetExternalAPI === 'undefined') {
-                console.error('JitsiMeetExternalAPI not available.');
-                this.jitsiLoadStarted = false;
-                return;
-            }
-
-            const parentNode = document.getElementById('jitsi-container');
-            if (! parentNode) {
-                console.error('Jitsi container node missing.');
-                this.jitsiLoadStarted = false;
-                return;
-            }
-
-            const options = {
-                roomName:     this.roomId,
-                parentNode,
-                userInfo: {
-                    displayName: this.displayName,
-                    email:       this.email,
-                },
-                configOverwrite: {
-                    startWithAudioMuted: false,
-                    startWithVideoMuted: false,
-                    disableDeepLinking: true,
-                    prejoinPageEnabled: false,
-                    // Participant pane / invite / security / mute-all need toolbar entries.
-                    toolbarButtons: [
-                        'microphone',
-                        'camera',
-                        'desktop',
-                        'chat',
-                        'raisehand',
-                        'participants-pane',
-                        'invite',
-                        'tileview',
-                        'hangup',
-                        'settings',
-                        'fullscreen',
-                        'filmstrip',
-                        'mute-everyone',
-                        'security',
-                    ],
-                    participantsPane: {
-                        hideModeratorSettingsTab: false,
-                        hideMoreActionsButton: false,
-                        hideMuteAllButton: false,
-                    },
-                },
-                interfaceConfigOverwrite: {
-                    SHOW_JITSI_WATERMARK: false,
-                    SHOW_WATERMARK_FOR_GUESTS: false,
-                    SHOW_BRAND_WATERMARK: false,
-                    BRAND_WATERMARK_LINK: '',
-                    MOBILE_APP_PROMO: false,
-                    DEFAULT_REMOTE_DISPLAY_NAME: 'Participant',
-                },
-                width:  '100%',
-                height: '100%',
-            };
-
-            if (this.jwt) {
-                options.jwt = this.jwt;
-            }
-
-            this.api = new JitsiMeetExternalAPI(this.domain, options);
-
-            this.bindJitsiEvents();
-            this.startTimer();
-            // Iframe + API accept executeCommand once constructed (before full conference join).
-            this.jitsiReady = true;
-        },
-
-        // ----------------------------------------------------------------
-        // Jitsi Events
-        // ----------------------------------------------------------------
-        bindJitsiEvents() {
-            this.api.addEventListeners({
-                videoConferenceJoined: (event) => {
-                    console.log('Jitsi: joined', event);
-                    this.jitsiReady = true;
-                },
-
-                videoConferenceLeft: (event) => {
-                    console.log('Jitsi: left', event);
-                    @this.call('leaveMeeting');
-                },
-
-                participantJoined: (event) => {
-                    console.log('Jitsi: participant joined', event);
-                    // Livewire handles participant list via Echo
-                },
-
-                participantLeft: (event) => {
-                    console.log('Jitsi: participant left', event);
-                },
-
-                audioMuteStatusChanged: ({ muted }) => {
-                    this.audioMuted = muted;
-                },
-
-                videoMuteStatusChanged: ({ muted }) => {
-                    this.videoMuted = muted;
-                },
-
-                screenSharingStatusChanged: ({ on }) => {
-                    this.isSharing = on;
-                },
-            });
-        },
-
-        // ----------------------------------------------------------------
-        // Controls
-        // ----------------------------------------------------------------
-        toggleAudio() {
-            if (this.api) {
-                this.api.executeCommand('toggleAudio');
-            }
-        },
-
-        toggleVideo() {
-            if (this.api) {
-                this.api.executeCommand('toggleVideo');
-            }
-        },
-
-        toggleScreenShare() {
-            if (this.api) {
-                this.api.executeCommand('toggleShareScreen');
-            }
-        },
-
-        toggleJitsiChat() {
-            if (this.api) {
-                this.api.executeCommand('toggleChat');
-            }
-        },
-
-        // ----------------------------------------------------------------
-        // Meeting-ended handler
-        // ----------------------------------------------------------------
-        onMeetingEnded() {
-            this.isMeetingEnded = true;
-            this.stopTimer();
-            if (this.api) {
-                this.api.dispose();
-                this.api = null;
-            }
-            this.jitsiLoadStarted = false;
-            this.jitsiReady = false;
-        },
-
-        // ----------------------------------------------------------------
-        // Timer
-        // ----------------------------------------------------------------
-        startTimer() {
-            this.startedAt = Date.now();
-            this.timerInterval = setInterval(() => {
-                const diff = Math.floor((Date.now() - this.startedAt) / 1000);
-                const h    = Math.floor(diff / 3600);
-                const m    = Math.floor((diff % 3600) / 60);
-                const s    = diff % 60;
-                this.elapsedTime = h > 0
-                    ? `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`
-                    : `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
-            }, 1000);
-        },
-
-        stopTimer() {
-            if (this.timerInterval) {
-                clearInterval(this.timerInterval);
-                this.timerInterval = null;
-            }
-        },
-    };
-}
-</script>
-@endpush
