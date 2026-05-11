@@ -13,7 +13,15 @@
 
     @filamentStyles
     @livewireStyles
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    {{-- Avoid hard-failing when Vite is not running in dev (no public/hot) and no prod build yet. --}}
+    @php
+        $filamentMeetViteReady = file_exists(public_path('hot'))
+            || file_exists(public_path('build/manifest.json'))
+            || file_exists(public_path('build/.vite/manifest.json'));
+    @endphp
+    @if ($filamentMeetViteReady)
+        @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @endif
 
     <style>
         [x-cloak] { display: none !important; }
@@ -50,10 +58,11 @@
     @livewireScripts
 
     <script>
-        // Handle Livewire dispatch for panel redirect
-        document.addEventListener('livewire:init', () => {
-            Livewire.on('redirect-to-panel', (event) => {
-                window.location.href = event.url;
+        document.addEventListener('livewire:initialized', () => {
+            Livewire.on('redirect-to-panel', ({ url }) => {
+                if (url) {
+                    window.location.href = url;
+                }
             });
         });
     </script>

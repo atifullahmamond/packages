@@ -56,6 +56,8 @@ class MeetingRoom extends Component
             logger()->warning("MeetingRoom join issue: {$e->getMessage()}");
         }
 
+        $this->meeting->refresh();
+
         $this->refreshParticipants();
     }
 

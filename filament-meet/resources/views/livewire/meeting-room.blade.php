@@ -10,6 +10,7 @@ window.meetingRoom = function meetingRoom(config) {
         jwt:         config.jwt,
         isHost:      config.isHost,
         meetingUuid: config.meetingUuid,
+        livewireComponentId: config.livewireComponentId,
 
         // State
         api:               null,
@@ -156,7 +157,7 @@ window.meetingRoom = function meetingRoom(config) {
 
                 videoConferenceLeft: (event) => {
                     console.log('Jitsi: left', event);
-                    @this.call('leaveMeeting');
+                    window.Livewire?.find(this.livewireComponentId)?.call('leaveMeeting');
                 },
 
                 participantJoined: (event) => {
@@ -253,13 +254,14 @@ window.meetingRoom = function meetingRoom(config) {
     class="flex flex-col h-full"
     wire:poll.5s="refreshMeetingWhenWaiting"
     x-data="meetingRoom(@js([
-        'roomId'      => $roomId,
-        'domain'      => $jitsiDomain,
-        'displayName' => $displayName,
-        'email'       => $userEmail,
-        'jwt'         => $jwtToken,
-        'isHost'      => $isHost,
-        'meetingUuid' => $meeting->uuid,
+        'roomId'               => $roomId,
+        'domain'               => $jitsiDomain,
+        'displayName'          => $displayName,
+        'email'                => $userEmail,
+        'jwt'                  => $jwtToken,
+        'isHost'               => $isHost,
+        'meetingUuid'          => $meeting->uuid,
+        'livewireComponentId'  => $__livewire->getId(),
     ]))"
     x-init="init()"
     x-cloak
