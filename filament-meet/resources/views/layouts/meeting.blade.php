@@ -43,10 +43,11 @@
         @yield('content')
     </div>
 
+    {{-- Meeting room defines global Alpine helpers; must run before Filament/Livewire boot Alpine. --}}
+    @stack('scripts')
+
     @filamentScripts
     @livewireScripts
-
-    @stack('scripts')
 
     <script>
         // Handle Livewire dispatch for panel redirect
