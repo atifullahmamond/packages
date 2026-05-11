@@ -47,7 +47,7 @@ class FilamentMeetInstallCommand extends Command
         $this->newLine();
         $this->components->info('Next steps');
         $this->line('  1. <fg=cyan>php artisan migrate</>');
-        $this->line('  2. Meeting room UI: in <fg=cyan>resources/css/app.css</> add Tailwind <fg=cyan>@source</> for this package’s Blade files, then <fg=cyan>npm run build</> (see README “Frontend assets”).');
+        $this->line('  2. Meeting room UI: in <fg=cyan>resources/css/app.css</> add Tailwind <fg=cyan>@source</> for this package’s Blade files (ZIP installs: <fg=cyan>.../filament-meet/filament-meet/resources/</>), then <fg=cyan>npm install</> and <fg=cyan>npm run build</> (see README “Frontend assets”).');
         $this->line('  3. Add the <fg=cyan>meeting.{uuid}</> broadcast channel to <fg=cyan>routes/channels.php</> (see README).');
         $this->line('  4. Set <fg=cyan>BROADCAST_CONNECTION</> and Echo (Reverb/Pusher, etc.) — or <fg=cyan>FILAMENT_MEET_BROADCASTING=false</> to skip.');
         $this->newLine();

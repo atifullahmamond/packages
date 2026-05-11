@@ -2,7 +2,7 @@
 <div
     class="meet-app flex flex-col h-full"
     wire:poll.5s="refreshMeetingWhenWaiting"
-    x-data="meetingRoom(@js([
+    x-data="window.meetingRoom(@js([
         'roomId'               => $roomId,
         'domain'               => $jitsiDomain,
         'displayName'          => $displayName,

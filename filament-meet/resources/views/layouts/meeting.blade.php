@@ -20,7 +20,7 @@
             || file_exists(public_path('build/.vite/manifest.json'));
     @endphp
     @if ($filamentMeetViteReady)
-        @vite(['resources/css/app.css', 'resources/js/app.js'])
+        @vite(['resources/css/app.css'])
     @endif
 
     <style>

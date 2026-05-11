@@ -139,17 +139,25 @@ The meeting room Blade file uses **Tailwind utility classes**. Your app’s CSS 
 
 In **`resources/css/app.css`** (Tailwind v4), add a **`@source`** line so Tailwind scans this package’s Blade files.
 
-**Normal install** (package only under `vendor/`):
+**Composer “package” + GitHub ZIP** (README Method A): the monorepo unpacks an extra **`filament-meet/`** folder under `vendor/`. Use this path (note the **double** `filament-meet`):
+
+```css
+@source '../../vendor/atifullahmamond/filament-meet/filament-meet/resources/**/*.blade.php';
+```
+
+**Composer `path` repo** where `url` points at the package root (the folder that contains this package’s `composer.json` with `src/` next to `resources/`):
 
 ```css
 @source '../../vendor/atifullahmamond/filament-meet/resources/**/*.blade.php';
 ```
 
-**Same repo as your app** (e.g. `packages/filament-meet` next to `app/`), use that path instead (or in addition):
+**Same repo as your app** (e.g. `packages/filament-meet` next to `app/`):
 
 ```css
 @source '../../packages/filament-meet/resources/**/*.blade.php';
 ```
+
+If unsure, run **`ls vendor/atifullahmamond/filament-meet`** — if you see a **`filament-meet`** subfolder with `resources/`, use the first snippet; if you see `resources/` directly, use the second.
 
 Then rebuild assets:
 
@@ -308,7 +316,9 @@ Create a meeting from the Filament **Meetings** resource and use **Join** or the
 
 ### Step 9 — Frontend assets — Vite (required for the meeting room)
 
-The meeting layout calls **`@vite(['resources/css/app.css', 'resources/js/app.js'])`**. Until Vite outputs a manifest, Laravel throws **`ViteManifestNotFoundException`** (**`public/build/manifest.json`** missing).
+The meeting layout calls **`@vite(['resources/css/app.css'])`** so Tailwind from your app’s entry CSS loads in the full-screen room. (An empty **`resources/js/app.js`** is not required for this page.)
+
+Until Vite outputs a manifest, Laravel throws **`ViteManifestNotFoundException`** (**`public/build/manifest.json`** or **`public/build/.vite/manifest.json`** missing).
 
 In your Laravel app root, run:
 
@@ -321,7 +331,7 @@ Then reload **`/meet/room/{uuid}`**. On deploy/CI you must run **`npm run build`
 
 **Local development:** you can keep **`npm run dev`** running instead of rebuilding every change; Laravel will use **`public/build/hot`**. Stop the dev server without ever running **`npm run build`** and you will see the manifest error again.
 
-Ensure **`resources/js/app.js`** and **`resources/css/app.css`** exist (default Laravel installs include them).
+Ensure **`resources/css/app.css`** exists (default Laravel installs include it). Keep **`resources/js/app.js`** if your app or Vite config still lists it as an entry elsewhere.
 
 ---
 
@@ -330,6 +340,19 @@ Ensure **`resources/js/app.js`** and **`resources/css/app.css`** exist (default 
 ```bash
 php artisan optimize:clear
 ```
+
+---
+
+## Troubleshooting — meeting room UI / CSS / Alpine
+
+| Symptom | What to check |
+|--------|----------------|
+| **Blank room, “Preparing your room…”, or console: `meetingRoom is not a function` / `undefined is not a function`** | **Livewire v4** evaluates `x-data` in a scoped Alpine proxy; globals are not visible as bare names. This package uses **`x-data="window.meetingRoom(...)"`** and **`window.meetingRoom = function …`**. If you published views earlier, republish or align **`resources/views/vendor/filament-meet/livewire/meeting-room.blade.php`** with the package. |
+| **Tailwind classes missing (layout looks unstyled)** | Add the **`@source`** paths from **Step 4b**, then **`npm run build`**. The meeting layout also includes **fallback CSS** (`.meet-app`, `#jitsi-container`, …) so Jitsi can mount without every utility. |
+| **Stylesheet request 404 or wrong host/port** (`/build/...` never loads) | **`APP_URL`** must match how you open the app (including **`:8000`** for `php artisan serve`), **or** force **root-relative** Vite URLs in your app (not in the package), e.g. in **`AppServiceProvider::boot()`** when not using the Vite dev server: `Vite::createAssetPathsUsing(fn (string $path, ?bool $secure = null): string => '/'.ltrim($path, '/'));` — skip when **`Vite::isRunningHot()`** is true. |
+| **`ViteManifestNotFoundException`** | Run **`npm run build`** (or **`npm run dev`**) so **`public/build/manifest.json`** or **`public/hot`** exists. |
+
+**Script load order (built-in layout):** Inline helpers that define **`window.meetingRoom`** are emitted **before** **`@filamentScripts` / `@livewireScripts`** so Alpine can resolve them. If you override **`layouts/meeting.blade.php`**, keep that order.
 
 ---
 
@@ -352,7 +375,7 @@ filament-meet/
 │       ├── layouts/
 │       │   └── meeting.blade.php         ← Full-screen meeting layout
 │       ├── livewire/
-│       │   └── meeting-room.blade.php    ← Meeting room UI + Alpine.js
+│       │   └── meeting-room.blade.php    ← Meeting room UI + Alpine (Livewire v4: `window.meetingRoom`)
 │       └── meeting-room.blade.php        ← Controller entry point view
 └── src/
     ├── FilamentMeetPlugin.php            ← Filament v5 Plugin class
@@ -430,7 +453,7 @@ After upgrading the PHP package, remind users (or your own apps) to **`npm run b
 - [ ] **`git tag` releases** on GitHub, e.g. `v1.0.0`.
 - [ ] **Packagist** submit + hook for auto‑update after push.
 - [ ] **Smoke test** another Laravel app via `composer require atifullahmamond/filament-meet` (not only `path`).
-- [ ] **README Step 4b** — Tailwind `@source` + `npm run build` documented for meeting room UI.
+- [x] **README Step 4b + Troubleshooting** — Tailwind `@source`, `npm run build`, Livewire 4 / Vite notes documented.
 - Optional: **CHANGELOG.md**, PHPUnit/Pest tests, GitHub Actions CI.
 
 ## Feature Checklist
