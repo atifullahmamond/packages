@@ -159,13 +159,6 @@ In **`resources/css/app.css`** (Tailwind v4), add a **`@source`** line so Tailwi
 
 If unsure, run **`ls vendor/atifullahmamond/filament-meet`** — if you see a **`filament-meet`** subfolder with `resources/`, use the first snippet; if you see `resources/` directly, use the second.
 
-Then rebuild assets:
-
-```bash
-npm run build
-# or during development:
-npm run dev
-```
 
 The package also ships **minimal fallback CSS** in the meeting layout (`.meet-app`, `#jitsi-container`, etc.) so Jitsi can mount even without every utility — but you should still add `@source` and run **`npm run build`** for the full UI.
 
